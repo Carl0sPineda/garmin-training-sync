@@ -305,6 +305,7 @@ def parse_block(block: str) -> dict:
 
     date = None
     name = None
+    sport = "running"
     session_lines = []
     in_session = False
 
@@ -316,6 +317,9 @@ def parse_block(block: str) -> dict:
 
         elif normalized.startswith("nombre:"):
             name = line.split(":", 1)[1].strip()
+
+        elif normalized.startswith("deporte:"):
+            sport = line.split(":", 1)[1].strip().lower()
 
         elif normalized.startswith("sesion:"):
             in_session = True
@@ -335,6 +339,7 @@ def parse_block(block: str) -> dict:
     return {
         "date": date,
         "name": name,
+        "sport": sport,
         "description": "Generado desde lenguaje natural",
         "steps": parse_session_lines(session_lines),
     }

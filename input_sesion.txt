@@ -1,7 +1,7 @@
-Fecha: 2026-07-09
-Nombre: Jue09-Jul - Cuestas Lap Natural
+Fecha: 2026-07-01
+Nombre: Mié01-Jul - Umbral
 
 Sesión:
-hasta lap calentamiento al inicio de la cuesta
-5x3min @4:20-4:40 rec 2:30 lap
+15 min calentamiento Z1
+4 x 1 km @4:10-4:25 rec 2 min
 10 min enfriamiento Z1

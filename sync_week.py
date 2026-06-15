@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from garminconnect import Garmin
 from garminconnect.workout import (
     RunningWorkout,
+    CyclingWorkout,
     WorkoutSegment,
     create_warmup_step,
     create_interval_step,
@@ -54,6 +55,27 @@ KILOMETER_UNIT = {
     "unitKey": "kilometer",
     "factor": 100000.0,
 }
+
+def get_sport_config(sport: str) -> dict:
+    sport = (sport or "running").lower()
+
+    if sport == "running":
+        return {
+            "sportTypeId": 1,
+            "sportTypeKey": "running",
+            "workout_class": RunningWorkout,
+            "upload_method": "upload_running_workout",
+        }
+
+    if sport in ["cycling", "mtb", "bike", "biking"]:
+        return {
+            "sportTypeId": 2,
+            "sportTypeKey": "cycling",
+            "workout_class": CyclingWorkout,
+            "upload_method": "upload_cycling_workout",
+        }
+
+    raise ValueError(f"Deporte no soportado: {sport}")
 
 
 def get_args():
@@ -237,7 +259,10 @@ def build_step(step: dict, order: int):
     return step_obj
 
 
-def build_workout(item: dict) -> RunningWorkout:
+def build_workout(item: dict):
+    sport = item.get("sport", "running")
+    sport_config = get_sport_config(sport)
+
     steps = [
         build_step(step, index + 1)
         for index, step in enumerate(item["steps"])
@@ -251,7 +276,9 @@ def build_workout(item: dict) -> RunningWorkout:
     if total_distance is None:
         total_distance = calculate_distance(item["steps"]) or None
 
-    return RunningWorkout(
+    workout_class = sport_config["workout_class"]
+
+    return workout_class(
         workoutName=item["name"],
         description=item.get("description"),
         estimatedDurationInSecs=total_duration,
@@ -260,8 +287,8 @@ def build_workout(item: dict) -> RunningWorkout:
             WorkoutSegment(
                 segmentOrder=1,
                 sportType={
-                    "sportTypeId": 1,
-                    "sportTypeKey": "running",
+                    "sportTypeId": sport_config["sportTypeId"],
+                    "sportTypeKey": sport_config["sportTypeKey"],
                 },
                 workoutSteps=steps,
             )
@@ -350,6 +377,7 @@ def preview_workout(item: dict):
     print("PREVIEW: se crearía y agendaría este workout")
     print(f"Nombre: {item['name']}")
     print(f"Fecha: {item['date']}")
+    print(f"Deporte: {item.get('sport', 'running')}")
     print(f"Descripción: {item.get('description', '')}")
     print(f"Duración estimada: {total_duration} segundos")
     print(f"Distancia estimada: {total_distance} metros")
@@ -382,11 +410,15 @@ def main():
             print("-" * 40)
             continue
 
-        print(f"Creando workout: {name}")
+        sport = item.get("sport", "running")
+        sport_config = get_sport_config(sport)
+
+        print(f"Creando workout: {name} [{sport_config['sportTypeKey']}]")
 
         workout = build_workout(item)
-        created = client.upload_running_workout(workout)
 
+        upload_method = getattr(client, sport_config["upload_method"])
+        created = upload_method(workout)
         workout_id = created["workoutId"]
 
         print(f"Agendando {name} para {date}")
