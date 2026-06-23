@@ -52,17 +52,22 @@ st.markdown(
 
 
 def init_state():
-    if "client" not in st.session_state:
-        st.session_state.client = None
+    defaults = {
+        "client": None,
+        "authenticated": False,
+        "plan": None,
+        "logs": [],
+        "syncing": False,
+        "sync_status_type": None,
+        "sync_status_message": None,
+        "auth_status_type": None,
+        "auth_status_message": None,
+        "pending_sync": False,
+    }
 
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-
-    if "plan" not in st.session_state:
-        st.session_state.plan = None
-
-    if "logs" not in st.session_state:
-        st.session_state.logs = []
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
 def log(message: str):
@@ -75,6 +80,20 @@ def authenticate(email: str, password: str):
 
     st.session_state.client = client
     st.session_state.authenticated = True
+
+
+def render_alert(status_type: str | None, message: str | None):
+    if not status_type or not message:
+        return
+
+    if status_type == "success":
+        st.success(message)
+    elif status_type == "error":
+        st.error(message)
+    elif status_type == "warning":
+        st.warning(message)
+    else:
+        st.info(message)
 
 
 def render_step(step: dict, indent: int = 0):
@@ -117,25 +136,34 @@ def render_step(step: dict, indent: int = 0):
 
 
 def render_preview(plan: dict):
-    for workout in plan["workouts"]:
-        sport = workout.get("sport", "running")
-        duration = calculate_duration(workout["steps"])
-        distance = calculate_distance(workout["steps"])
+    workouts = plan["workouts"]
 
-        with st.container(border=True):
-            st.markdown(f"### {workout['name']}")
-            st.markdown(
-                f"""
-                **Fecha:** {workout['date']}  
-                **Deporte:** {sport}  
-                **Duración estimada:** {duration // 60} min  
-                **Distancia estimada:** {distance / 1000:.2f} km
-                """
-            )
+    for start in range(0, len(workouts), 3):
+        cols = st.columns(3, gap="medium")
+        row_items = workouts[start:start + 3]
 
-            st.markdown("**Pasos:**")
-            for step in workout["steps"]:
-                render_step(step)
+        for col, workout in zip(cols, row_items):
+            with col:
+                sport = workout.get("sport", "running")
+                duration = calculate_duration(workout["steps"])
+                distance = calculate_distance(workout["steps"])
+
+                sport_icon = "🏃" if sport == "running" else "🚴"
+
+                with st.container(border=True):
+                    st.markdown(f"### {sport_icon} {workout['name']}")
+                    st.markdown(
+                        f"""
+                        **Fecha:** {workout['date']}  
+                        **Deporte:** {sport}  
+                        **Duración:** {duration // 60} min  
+                        **Distancia:** {distance / 1000:.2f} km
+                        """
+                    )
+
+                    st.markdown("**Pasos:**")
+                    for step in workout["steps"]:
+                        render_step(step)
 
 
 def sync_plan(plan: dict):
@@ -143,6 +171,9 @@ def sync_plan(plan: dict):
 
     if not client:
         raise ValueError("Primero debés autenticarte con Garmin.")
+
+    created_count = 0
+    skipped_count = 0
 
     for item in plan["workouts"]:
         name = item["name"]
@@ -153,6 +184,7 @@ def sync_plan(plan: dict):
         log(f"Revisando: {name} / {date}")
 
         if scheduled_exists(client, name, date):
+            skipped_count += 1
             log(f"Saltado: ya existe en calendario → {name}")
             continue
 
@@ -168,8 +200,12 @@ def sync_plan(plan: dict):
         log(f"Agendando para {date}")
         scheduled = client.schedule_workout(workout_id, date)
 
+        created_count += 1
+
         log(f"OK workoutId: {workout_id}")
         log(f"OK scheduleId: {scheduled['workoutScheduleId']}")
+
+    return created_count, skipped_count
 
 
 init_state()
@@ -191,17 +227,24 @@ with left:
     email = st.text_input("Email Garmin")
     password = st.text_input("Password Garmin", type="password")
 
-    if st.button("Autenticar", use_container_width=True):
+    if st.button("Autenticar", use_container_width=True, disabled=st.session_state.syncing):
         try:
             with st.spinner("Autenticando con Garmin..."):
                 authenticate(email, password)
 
-            st.success("Autenticación correcta.")
+            st.session_state.auth_status_type = "success"
+            st.session_state.auth_status_message = "Autenticación correcta."
             log("Autenticación correcta.")
 
         except Exception as e:
-            st.error("No se pudo autenticar.")
+            st.session_state.auth_status_type = "error"
+            st.session_state.auth_status_message = "No se pudo autenticar."
             log(f"Error autenticando: {e}")
+
+    render_alert(
+        st.session_state.auth_status_type,
+        st.session_state.auth_status_message,
+    )
 
     if st.session_state.authenticated:
         st.markdown('<p class="status-ok">● Conectado</p>', unsafe_allow_html=True)
@@ -212,32 +255,82 @@ with left:
 
     st.subheader("Acciones")
 
-    generate_clicked = st.button("Generar Preview", use_container_width=True)
-    sync_clicked = st.button("Sincronizar", use_container_width=True, type="primary")
+    generate_clicked = st.button(
+        "Generar Preview",
+        use_container_width=True,
+        disabled=st.session_state.syncing,
+    )
+
+    sync_button_label = "⏳ Sincronizando..." if st.session_state.syncing else "Sincronizar"
+
+    sync_clicked = st.button(
+        sync_button_label,
+        use_container_width=True,
+        type="primary",
+        disabled=st.session_state.syncing,
+    )
+
+    clear_clicked = st.button(
+    "Limpiar",
+    use_container_width=True,
+    disabled=st.session_state.syncing,
+    )
+
+    if clear_clicked:
+        st.session_state.session_text = ""
+        st.session_state.plan = None
+        st.rerun()
+
+    sync_status_container = st.container()
+
+    with sync_status_container:
+        render_alert(
+            st.session_state.sync_status_type,
+            st.session_state.sync_status_message,
+        )
+
+    if sync_clicked:
+        st.session_state.pending_sync = True
+        st.session_state.syncing = True
+        st.session_state.sync_status_type = "info"
+        st.session_state.sync_status_message = "Sincronizando con Garmin Connect..."
+        st.rerun()
 
 
 with right:
     st.subheader("Sesiones de entrenamiento")
 
-    default_text = """Fecha: 2026-07-01
+    default_text = "Pegá aquí el bloque de sesiones de entrenamientocompatible"
+
+    placeholder_text = """Fecha: 2026-07-01
 Nombre: Mié01-Jul - Umbral
 
 Sesión:
 15 min calentamiento Z1
 4 x 1 km @4:10-4:25 rec 2 min
-10 min enfriamiento Z1"""
+10 min enfriamiento Z1
+
+---
+Fecha: 2026-07-04
+Nombre: Sáb04-Jul - Easy
+
+Sesión:
+45 min fácil Z2"""
 
     session_text = st.text_area(
-        "Pegá aquí el bloque compatible",
-        value=default_text,
-        height=320,
-        label_visibility="collapsed",
-    )
+            "Sesiones",
+            key="session_text",
+            placeholder=default_text,
+            height=320,
+            label_visibility="collapsed",
+            disabled=st.session_state.syncing,
+            )
 
     if generate_clicked:
         try:
             plan = parse_input(session_text)
             st.session_state.plan = plan
+
             st.success(f"Preview generado. Workouts: {len(plan['workouts'])}")
             log(f"Preview generado. Workouts: {len(plan['workouts'])}")
 
@@ -261,21 +354,32 @@ Sesión:
             file_name="plan_semana.json",
             mime="application/json",
             use_container_width=True,
+            disabled=st.session_state.syncing,
         )
 
-    if sync_clicked:
-        try:
-            if not st.session_state.plan:
-                st.session_state.plan = parse_input(session_text)
 
-            with st.spinner("Sincronizando con Garmin Connect..."):
-                sync_plan(st.session_state.plan)
+if st.session_state.pending_sync:
+    try:
+        if not st.session_state.plan:
+            st.session_state.plan = parse_input(session_text)
 
-            st.success("Sincronización finalizada.")
+        created_count, skipped_count = sync_plan(st.session_state.plan)
 
-        except Exception as e:
-            st.error("No se pudo sincronizar.")
-            log(f"Error sincronizando: {e}")
+        st.session_state.sync_status_type = "success"
+        st.session_state.sync_status_message = (
+            f"Sincronización finalizada. "
+            f"Creados: {created_count}. Saltados: {skipped_count}."
+        )
+
+    except Exception as e:
+        st.session_state.sync_status_type = "error"
+        st.session_state.sync_status_message = "No se pudo sincronizar."
+        log(f"Error sincronizando: {e}")
+
+    finally:
+        st.session_state.pending_sync = False
+        st.session_state.syncing = False
+        st.rerun()
 
 
 st.divider()
