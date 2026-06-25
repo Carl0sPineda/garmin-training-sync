@@ -277,25 +277,32 @@ def parse_until_lap_step(line: str, step_type: str = "run") -> dict | None:
     return step
 
 
+_parse_warnings: list[str] = []
+
+
 def parse_session_lines(lines: list[str]) -> list[dict]:
     steps = []
     clean_lines = [line.strip() for line in lines if line.strip()]
 
     for index, line in enumerate(clean_lines):
-        lap_step = parse_until_lap_step(line)
+        try:
+            lap_step = parse_until_lap_step(line)
 
-        if lap_step:
-            steps.append(lap_step)
-            continue
+            if lap_step:
+                steps.append(lap_step)
+                continue
 
-        repeat = parse_repeat(line)
+            repeat = parse_repeat(line)
 
-        if repeat:
-            steps.append(repeat)
-            continue
+            if repeat:
+                steps.append(repeat)
+                continue
 
-        step_type = infer_step_type(line, index, len(clean_lines))
-        steps.append(build_basic_step(line, step_type=step_type))
+            step_type = infer_step_type(line, index, len(clean_lines))
+            steps.append(build_basic_step(line, step_type=step_type))
+
+        except ValueError as e:
+            _parse_warnings.append(str(e))
 
     return steps
 
@@ -346,10 +353,17 @@ def parse_block(block: str) -> dict:
 
 
 def parse_input(text: str) -> dict:
+    global _parse_warnings
+    _parse_warnings = []
+
     blocks = [block.strip() for block in text.split("---") if block.strip()]
     workouts = [parse_block(block) for block in blocks]
 
-    return {"workouts": workouts}
+    result: dict = {"workouts": workouts}
+    if _parse_warnings:
+        result["warnings"] = list(_parse_warnings)
+
+    return result
 
 
 def main():

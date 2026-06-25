@@ -329,10 +329,15 @@ Sesión:
     if generate_clicked:
         try:
             plan = parse_input(session_text)
+            warnings = plan.pop("warnings", [])
             st.session_state.plan = plan
 
             st.success(f"Preview generado. Workouts: {len(plan['workouts'])}")
             log(f"Preview generado. Workouts: {len(plan['workouts'])}")
+
+            for w in warnings:
+                st.warning(f"Paso ignorado (falta tiempo o distancia): {w}")
+                log(f"Paso ignorado: {w}")
 
         except Exception as e:
             st.error("No se pudo generar el preview.")
@@ -361,7 +366,9 @@ Sesión:
 if st.session_state.pending_sync:
     try:
         if not st.session_state.plan:
-            st.session_state.plan = parse_input(session_text)
+            result = parse_input(session_text)
+            result.pop("warnings", [])
+            st.session_state.plan = result
 
         created_count, skipped_count = sync_plan(st.session_state.plan)
 
