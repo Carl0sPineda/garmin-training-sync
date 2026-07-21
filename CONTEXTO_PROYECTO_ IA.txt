@@ -135,6 +135,7 @@ Series por tiempo:
 
 Progresiones:
 4 progresiones de 20s
+(la recuperación siempre es el doble del esfuerzo; si se omite "de Xs" usa 20s por defecto)
 
 Recuperaciones:
 
@@ -183,6 +184,49 @@ Si es descanso:
 Sesión:
 Descanso
 
+Deporte (opcional, por defecto running):
+
+Fecha: 2026-07-01
+Nombre: Mié01-Jul - Rodaje bici
+
+Deporte: cycling
+
+Sesión:
+45 min Z2
+
+Deportes soportados: running, cycling, mtb, bike, biking.
+
+REGLAS ESTRICTAS DEL PARSER (NO VIOLAR)
+
+El parser interpreta cada línea de forma literal. Si una regla se rompe, el paso se ignora silenciosamente y no aparece en el workout generado. Por eso:
+
+1. Cada paso debe empezar directamente con el número (cantidad de tiempo o distancia). Nunca anteponer palabras descriptivas como "Últimos", "Primeros", etc.
+
+Incorrecto: Últimos 3 km @5:45-5:55
+Correcto: 3 km @5:45-5:55
+
+Si el plan requiere describir "los últimos X km" de un fondo, dividir el fondo en dos líneas que sumen la distancia total:
+
+15 km Z2
+3 km @5:45-5:55
+
+2. En una repetición (Nx cantidad unidad rec tiempo), entre la cantidad/unidad y "rec" solo puede ir un objetivo de ritmo opcional (@ritmo). Nunca agregar palabras como "progresivos", "caminando", etc. en esa posición.
+
+Incorrecto: 4x20s progresivos rec 1min caminando
+Correcto: 4x20s rec 1min
+
+Para progresiones de aceleración usar siempre la sintaxis dedicada: "4 progresiones de 20s".
+
+3. El ritmo siempre en formato M:SS (ej. @4:30, @4:10-4:25). Nunca usar variantes como "4:30 min/km".
+
+4. La recuperación puede escribirse como minutos/segundos (rec 1min, rec 90s) o como M:SS sin unidad (rec 2:30).
+
+5. Las zonas Garmin son de un solo dígito: Z1 a Z9.
+
+6. "Descanso" debe ser la única línea dentro de "Sesión:". Si se agrega cualquier otro texto junto a "Descanso", deja de tratarse como día de descanso.
+
+7. En un paso simple (no repetición), nunca escribir un rango de tiempo (ej. "45-60 min"): solo se usa el primer número y el resto se descarta. Escribir siempre un único valor.
+
 VALIDACIÓN ANTES DE RESPONDER
 
 Antes de entregar un plan verifica:
@@ -193,5 +237,7 @@ Antes de entregar un plan verifica:
 ¿Los entrenamientos están separados por una línea con exactamente "---"?
 ¿No hay texto antes del primer "Fecha:"?
 ¿No hay texto después del último entrenamiento?
+¿Ningún paso empieza con una palabra antes del número (ej. "Últimos")?
+¿Ninguna repetición tiene texto entre la cantidad/unidad y "rec"?
 
 Si alguna respuesta es NO, corrige el formato antes de responder.

@@ -134,6 +134,20 @@ Sesión:
 10 min enfriamiento Z1
 ```
 
+Opcionalmente se puede indicar el deporte (por defecto `running`):
+
+```text
+Fecha: 2026-07-01
+Nombre: Mié01-Jul - Rodaje bici
+
+Deporte: cycling
+
+Sesión:
+45 min Z2
+```
+
+Deportes soportados: `running` (default), `cycling` / `mtb` / `bike` / `biking`.
+
 ---
 
 # Múltiples entrenamientos
@@ -308,7 +322,15 @@ repeat x4
 └─ recovery 40s
 ```
 
-También acepta rango:
+La recuperación siempre es el doble del esfuerzo. Si se omite "de Xs", usa 20s por defecto:
+
+```text
+4 progresiones          → 4x [run 20s / recovery 40s]
+4 progresiones de 30s   → 4x [run 30s / recovery 60s]
+4 progresiones de 1min  → 4x [run 60s / recovery 120s]
+```
+
+También acepta rango en la cantidad de repeticiones:
 
 ```text
 4-6 progresiones de 20s
@@ -356,6 +378,105 @@ Ideal para:
 - Trail running
 - Segmentos con distancia variable
 - Regreso al inicio de una cuesta
+
+---
+
+# Reglas y limitaciones importantes
+
+El parser es literal: interpreta el inicio de cada línea con patrones fijos. Estas son las reglas que evitan que un paso se ignore.
+
+## Cada paso debe empezar con el número
+
+No se permiten palabras descriptivas antes de la cantidad.
+
+Incorrecto:
+```text
+Últimos 3 km @5:45-5:55
+```
+
+Correcto:
+```text
+3 km @5:45-5:55
+```
+
+Si necesitás describir "los últimos X km" de un fondo más largo, dividí el fondo en dos líneas que sumen la distancia total:
+
+```text
+15 km Z2
+3 km @5:45-5:55
+```
+
+## En repeticiones, nada de texto libre entre la cantidad y "rec"
+
+Entre `Nx cantidad unidad` y `rec` solo se permite un objetivo de ritmo opcional (`@ritmo`). Ninguna otra palabra.
+
+Incorrecto:
+```text
+4x20s progresivos rec 1min caminando
+```
+
+Correcto:
+```text
+4x20s rec 1min
+```
+
+(Para progresiones reales de aceleración, usar la sintaxis dedicada — ver sección "Progresiones".)
+
+Después de `rec <tiempo>` sí se puede agregar texto libre (se intenta interpretar como zona/FC/ritmo de recuperación; si no coincide con ningún formato reconocido, simplemente se ignora sin generar error).
+
+## Un paso mal escrito no rompe todo el plan
+
+Si una línea no se puede interpretar, `generate_plan.py` la omite y sigue con el resto, mostrando un aviso como:
+
+```text
+Paso ignorado (falta tiempo o distancia): No pude interpretar paso: <línea>
+```
+
+Revisar siempre estos avisos: significan que ese paso **no** se incluyó en el workout generado.
+
+## Un rango de duración en un paso simple usa solo el primer valor
+
+```text
+45-60 min Z2
+```
+
+No se promedia ni se usa el rango completo: toma 45 min y descarta el 60, mostrando un aviso:
+
+```text
+Rango de duración en "45-60 min Z2": se usó solo 45 min (el 60 se descartó)
+```
+
+Si necesitás un valor fijo, escribí un solo número.
+
+## Formato de ritmo siempre M:SS
+
+```text
+@4:30
+@4:10-4:25
+```
+
+No se aceptan variantes como `4:30 min/km` o `4.30`.
+
+## Recuperación acepta M:SS sin unidad
+
+```text
+rec 2:30
+```
+
+Equivale a 2 minutos 30 segundos, sin necesidad de escribir `min`.
+
+## Zonas Garmin de un solo dígito
+
+`Z1` a `Z9`. No se reconocen zonas de dos dígitos.
+
+## "Descanso" debe ser la única línea de la sesión
+
+```text
+Sesión:
+Descanso
+```
+
+Si hay más líneas junto a `Descanso`, no se trata como día de descanso.
 
 ---
 

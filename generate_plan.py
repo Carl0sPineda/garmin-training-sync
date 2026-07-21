@@ -101,7 +101,7 @@ def build_basic_step(line: str, step_type: str = "run") -> dict:
     step = {"type": step_type}
 
     duration_match = re.match(
-        r"(\d+)(?:\s*-\s*\d+)?\s*(min|mins|minutos?|s|seg|segs|segundos?)",
+        r"(\d+)(?:\s*-\s*(\d+))?\s*(min|mins|minutos?|s|seg|segs|segundos?)",
         text,
     )
 
@@ -111,6 +111,11 @@ def build_basic_step(line: str, step_type: str = "run") -> dict:
     )
 
     if duration_match:
+        if duration_match.group(2):
+            _parse_warnings.append(
+                f"Rango de duración en \"{original}\": se usó solo {duration_match.group(1)} "
+                f"{duration_match.group(3)} (el {duration_match.group(2)} se descartó)"
+            )
         step["duration_seconds"] = parse_duration(duration_match.group(0))
     elif distance_match:
         step["distance_meters"] = parse_distance_meters(distance_match.group(0))
@@ -252,16 +257,26 @@ def infer_step_type(line: str, index: int, total: int) -> str:
 
 def parse_progressions(line: str) -> dict | None:
     text = normalize(line)
-    match = re.match(r"(\d+)(?:\s*-\s*(\d+))?\s*progresion(?:es)?", text)
+    match = re.match(
+        r"(\d+)(?:\s*-\s*(\d+))?\s*progresion(?:es)?"
+        r"(?:\s+de\s+(\d+)\s*(min|mins|minutos?|s|seg|segs|segundos?))?",
+        text,
+    )
     if not match:
         return None
     count = int(match.group(1))
+
+    if match.group(3):
+        run_seconds = parse_duration(f"{match.group(3)} {match.group(4)}")
+    else:
+        run_seconds = 20
+
     return {
         "type": "repeat",
         "count": count,
         "steps": [
-            {"type": "run", "duration_seconds": 20},
-            {"type": "recovery", "duration_seconds": 40},
+            {"type": "run", "duration_seconds": run_seconds},
+            {"type": "recovery", "duration_seconds": run_seconds * 2},
         ],
     }
 
