@@ -133,6 +133,9 @@ Series por distancia:
 Series por tiempo:
 6x2min @4:20-4:40 rec 1min
 
+Progresiones:
+4 progresiones de 20s
+
 Recuperaciones:
 
 Pueden incluir zona:

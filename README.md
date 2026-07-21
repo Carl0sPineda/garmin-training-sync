@@ -294,6 +294,30 @@ Ritmo:
 
 ---
 
+# Progresiones
+
+```text
+4 progresiones de 20s
+```
+
+Genera automáticamente:
+
+```text
+repeat x4
+├─ run 20s
+└─ recovery 40s
+```
+
+También acepta rango:
+
+```text
+4-6 progresiones de 20s
+```
+
+(usa el primer número como cantidad de repeticiones)
+
+---
+
 # Pulsación de botón Lap
 
 ## Paso individual
