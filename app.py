@@ -821,12 +821,82 @@ def render_dashboard():
     _recovery_chart(hrv_df, stats_df)
 
 
+def _compute_km_splits(details: dict | None, split_meters: float = 1000.0) -> pd.DataFrame:
+    """Build real per-kilometer splits from Garmin's raw distance/time data stream.
+
+    Returns an empty DataFrame when the activity has no detailed metrics
+    available (e.g. very old activities), so callers can fall back to laps.
+    """
+    if not details:
+        return pd.DataFrame()
+
+    descriptors = {d["key"]: d["metricsIndex"] for d in (details.get("metricDescriptors") or [])}
+    dist_idx = descriptors.get("sumDistance")
+    time_idx = descriptors.get("sumElapsedDuration", descriptors.get("sumDuration"))
+    if dist_idx is None or time_idx is None:
+        return pd.DataFrame()
+
+    hr_idx = descriptors.get("directHeartRate")
+    cad_idx = descriptors.get("directRunCadence", descriptors.get("directDoubleCadence"))
+    stride_idx = descriptors.get("directStrideLength")
+    gct_idx = descriptors.get("directGroundContactTime")
+    vo_idx = descriptors.get("directVerticalOscillation")
+
+    def _value(row, idx):
+        return row[idx] if idx is not None and idx < len(row) else None
+
+    samples = []
+    for entry in details.get("activityDetailMetrics") or []:
+        row = entry.get("metrics") or []
+        dist = _value(row, dist_idx)
+        t = _value(row, time_idx)
+        if dist is None or t is None:
+            continue
+        samples.append({
+            "dist": dist,
+            "t": t,
+            "hr": _value(row, hr_idx),
+            "cad": _value(row, cad_idx),
+            "stride": _value(row, stride_idx),
+            "gct": _value(row, gct_idx),
+            "vo": _value(row, vo_idx),
+        })
+
+    if len(samples) < 2 or samples[-1]["dist"] < split_meters * 0.5:
+        return pd.DataFrame()
+
+    def _avg(bucket, key):
+        vals = [b[key] for b in bucket if b[key] is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    records = []
+    bucket = []
+    next_boundary = split_meters
+    for i, s in enumerate(samples):
+        bucket.append(s)
+        if s["dist"] >= next_boundary or i == len(samples) - 1:
+            start, end = bucket[0], s
+            dist_covered = end["dist"] - start["dist"]
+            duration = end["t"] - start["t"]
+            if dist_covered > 0 and duration > 0:
+                pace = (duration / 60) * (1000 / dist_covered)
+                records.append({
+                    "km": len(records) + 1,
+                    "pace": round(pace, 2),
+                    "fc": _avg(bucket, "hr"),
+                    "cadencia": _avg(bucket, "cad"),
+                    "zancada": _avg(bucket, "stride"),
+                    "contacto": _avg(bucket, "gct"),
+                    "oscilacion": _avg(bucket, "vo"),
+                })
+            bucket = []
+            next_boundary += split_meters
+
+    return pd.DataFrame(records)
+
+
 def _activity_detail_charts(cached: dict, sport: str):
     summary_dto = (cached.get("activity") or {}).get("summaryDTO") or {}
-    laps_raw = [
-        lap for lap in ((cached.get("splits") or {}).get("lapDTOs") or [])
-        if (lap.get("duration") or 0) > 30 and (lap.get("distance") or 0) > 100
-    ]
     hr_zones_raw = cached.get("hr_zones") or []
     is_running = any(k in sport for k in ("running", "trail", "treadmill"))
 
@@ -841,21 +911,40 @@ def _activity_detail_charts(cached: dict, sport: str):
         else:
             st.caption(f"🌡️ Temperatura media: {avg_temp:.1f}°C")
 
-    if laps_raw:
-        records = []
-        for i, lap in enumerate(laps_raw):
-            speed = lap.get("averageSpeed") or 0
-            records.append({
-                "km": i + 1,
-                "pace": round((1000 / speed) / 60, 2) if speed > 0 else None,
-                "fc": lap.get("averageHR"),
-                "cadencia": lap.get("averageRunCadence"),
-                "zancada": lap.get("strideLength"),
-                "contacto": lap.get("groundContactTime"),
-                "oscilacion": lap.get("verticalOscillation"),
-            })
-        laps_df = pd.DataFrame(records)
+    laps_df = _compute_km_splits(cached.get("details"))
 
+    if laps_df.empty:
+        laps_raw = [
+            lap for lap in ((cached.get("splits") or {}).get("lapDTOs") or [])
+            if (lap.get("duration") or 0) > 30 and (lap.get("distance") or 0) > 100
+        ]
+        if laps_raw:
+            records = []
+            for i, lap in enumerate(laps_raw):
+                speed = lap.get("averageSpeed") or 0
+                records.append({
+                    "km": i + 1,
+                    "distancia_m": lap.get("distance"),
+                    "pace": round((1000 / speed) / 60, 2) if speed > 0 else None,
+                    "fc": lap.get("averageHR"),
+                    "cadencia": lap.get("averageRunCadence"),
+                    "zancada": lap.get("strideLength"),
+                    "contacto": lap.get("groundContactTime"),
+                    "oscilacion": lap.get("verticalOscillation"),
+                })
+            laps_df = pd.DataFrame(records)
+
+            avg_lap_distance = laps_df["distancia_m"].dropna().mean()
+            is_per_km = pd.notna(avg_lap_distance) and 900 <= avg_lap_distance <= 1100
+            if pd.notna(avg_lap_distance) and not is_per_km:
+                st.warning(
+                    f"⚠️ No se pudieron calcular splits reales por km (esta actividad no trae datos "
+                    f"detallados de distancia/tiempo). Se muestran en su lugar las {len(laps_df)} 'vueltas' "
+                    f"registradas por el reloj, que promedian {avg_lap_distance:.0f} m cada una — no son "
+                    "splits de 1 km exactos."
+                )
+
+    if not laps_df.empty:
         # ── Análisis de ejecución ──────────────────────────────────────────────
         pace_series = laps_df["pace"].dropna()
         n_km = len(pace_series)
@@ -1050,7 +1139,7 @@ def _activity_detail_charts(cached: dict, sport: str):
         },
     }
 
-    if laps_raw:
+    if not laps_df.empty:
         export_data["splits_por_km"] = laps_df.to_dict(orient="records")
 
         eff_ex = laps_df[laps_df["pace"].notna() & laps_df["fc"].notna()].copy()
@@ -1206,6 +1295,7 @@ def render_activities_tab():
                     "summary": row.to_dict(),
                     "activity": client.get_activity(activity_id),
                     "splits": client.get_activity_splits(activity_id),
+                    "details": client.get_activity_details(activity_id),
                     "hr_zones": client.get_activity_hr_in_timezones(activity_id),
                     "gpx": gpx_bytes,
                 }
