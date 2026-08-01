@@ -23,7 +23,9 @@ workout_debug.json
 .garmin_cache/
 
 # Garmin session tokens (equivalent to a password - not for git)
+# Garmin authentication
 .garminconnect/
+garmin_tokens.json
 
 # OS
 .DS_Store
