@@ -5,6 +5,7 @@ from datetime import datetime, time, timedelta
 import altair as alt
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from garminconnect import Garmin
 
@@ -895,6 +896,60 @@ def _compute_km_splits(details: dict | None, split_meters: float = 1000.0) -> pd
     return pd.DataFrame(records)
 
 
+def _copy_to_clipboard_button(text: str, key: str, label: str = "📋 Copiar JSON al portapapeles"):
+    """Botón que copia `text` al portapapeles sin volcarlo al DOM de Streamlit
+    (evita el costo de resaltado de sintaxis de st.code con textos muy grandes)."""
+    payload = json.dumps(text)
+    label_js = json.dumps(label)
+    html = f"""
+    <div style="font-family: 'Source Sans Pro', sans-serif;">
+      <button id="btn-{key}" style="
+          background-color: rgb(19, 23, 32); color: rgb(250, 250, 250);
+          border: 1px solid rgba(250, 250, 250, 0.2); border-radius: 0.5rem;
+          padding: 0.4rem 0.9rem; font-size: 0.9rem; cursor: pointer; width: 100%;
+          transition: background-color 0.15s, border-color 0.15s;
+      ">{label}</button>
+    </div>
+    <script>
+      const btn_{key} = document.getElementById("btn-{key}");
+      const originalLabel_{key} = {label_js};
+      let busy_{key} = false;
+      btn_{key}.addEventListener("click", async () => {{
+        if (busy_{key}) return;
+        busy_{key} = true;
+        const text = {payload};
+        let ok = true;
+        try {{
+          await navigator.clipboard.writeText(text);
+        }} catch (e) {{
+          try {{
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+          }} catch (e2) {{
+            ok = false;
+          }}
+        }}
+        btn_{key}.textContent = ok ? "✓ Copiado al portapapeles" : "✗ No se pudo copiar";
+        btn_{key}.style.backgroundColor = ok ? "#16a34a" : "#dc2626";
+        btn_{key}.style.borderColor = ok ? "#16a34a" : "#dc2626";
+        setTimeout(() => {{
+          btn_{key}.textContent = originalLabel_{key};
+          btn_{key}.style.backgroundColor = "rgb(19, 23, 32)";
+          btn_{key}.style.borderColor = "rgba(250, 250, 250, 0.2)";
+          busy_{key} = false;
+        }}, 1800);
+      }});
+    </script>
+    """
+    components.html(html, height=45)
+
+
 def _activity_detail_charts(cached: dict, sport: str):
     summary_dto = (cached.get("activity") or {}).get("summaryDTO") or {}
     hr_zones_raw = cached.get("hr_zones") or []
@@ -1329,7 +1384,16 @@ def render_activities_tab():
             )
 
         with st.expander("📋 Copiar JSON completo"):
-            st.code(json_str, language="json")
+            _copy_to_clipboard_button(json_str, key=f"copy_json_{activity_id}")
+            show_json = st.checkbox(
+                f"Generar vista previa ({len(json_str):,} caracteres — puede tardar y trabar el scroll en actividades largas)",
+                key=f"show_json_{activity_id}",
+            )
+            if show_json:
+                st.text_area(
+                    "JSON completo", json_str, height=400, label_visibility="collapsed",
+                    key=f"json_preview_{activity_id}",
+                )
 
         st.divider()
         _activity_detail_charts(cached, str(row.get("sport", "")))
