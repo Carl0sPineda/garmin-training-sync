@@ -103,3 +103,30 @@ def cached_batch_fetch(name: str, fetch_fn, client, days: int) -> pd.DataFrame:
         .sort_values("date")
         .reset_index(drop=True)
     )
+
+
+_ACTIVITY_DETAIL_DIR = os.path.join(CACHE_DIR, "activity_details")
+
+
+def cached_activity_bundle(client, activity_id: int) -> dict:
+    """Return the raw Garmin detail bundle (activity, splits, details, hr_zones) for
+    one activity_id, fetching it from Garmin only the first time. Past activities
+    never change, so once cached to disk it's reused forever - this is what makes
+    repeated bulk exports fast after the first one.
+    """
+    os.makedirs(_ACTIVITY_DETAIL_DIR, exist_ok=True)
+    path = os.path.join(_ACTIVITY_DETAIL_DIR, f"{activity_id}.json")
+
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    bundle = {
+        "activity": client.get_activity(activity_id),
+        "splits": client.get_activity_splits(activity_id),
+        "details": client.get_activity_details(activity_id),
+        "hr_zones": client.get_activity_hr_in_timezones(activity_id),
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(bundle, f, default=str)
+    return bundle

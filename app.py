@@ -9,7 +9,7 @@ import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from garminconnect import Garmin
 
-from garmin_cache import cached_batch_fetch
+from garmin_cache import cached_activity_bundle, cached_batch_fetch
 from generate_plan import parse_input
 from sync_week import (
     build_workout,
@@ -896,6 +896,82 @@ def _compute_km_splits(details: dict | None, split_meters: float = 1000.0) -> pd
     return pd.DataFrame(records)
 
 
+def _km_splits_analysis(laps_df: pd.DataFrame) -> dict:
+    """Same split_ratio/fade/CV/cadence-decay formulas used in _activity_detail_charts,
+    flattened into one row for bulk exports across many activities."""
+    if laps_df.empty:
+        return {}
+
+    result = {"n_km": len(laps_df)}
+
+    pace_series = laps_df["pace"].dropna()
+    if not pace_series.empty:
+        result["mejor_km_pace_minkm"] = round(pace_series.min(), 3)
+        result["peor_km_pace_minkm"] = round(pace_series.max(), 3)
+
+    n_km = len(pace_series)
+    if n_km >= 4:
+        pace_vals = pace_series.tolist()
+        mid = n_km // 2
+        first_half_avg = sum(pace_vals[:mid]) / mid
+        second_half_avg = sum(pace_vals[mid:]) / (n_km - mid)
+        result["split_ratio_pct"] = round((second_half_avg - first_half_avg) / first_half_avg * 100, 2)
+
+        third = max(1, n_km // 3)
+        result["fade_seg_km"] = round(
+            (sum(pace_vals[-third:]) / third - sum(pace_vals[:third]) / third) * 60, 1
+        )
+
+        pace_mean = pace_series.mean()
+        result["variacion_pace_cv_pct"] = round(
+            (pace_series.std() / pace_mean * 100) if pace_mean > 0 else 0.0, 2
+        )
+
+    cad_clean = laps_df["cadencia"].dropna().tolist()
+    if len(cad_clean) >= 4:
+        cad_first3 = sum(cad_clean[:3]) / 3
+        cad_last3 = sum(cad_clean[-3:]) / 3
+        if cad_first3:
+            result["cadencia_decaimiento_pct"] = round((cad_first3 - cad_last3) / cad_first3 * 100, 2)
+
+    return result
+
+
+def _hr_zone_breakdown(hr_zones_raw) -> dict:
+    zones_with_data = [z for z in (hr_zones_raw or []) if (z.get("secsInZone") or 0) > 0]
+    if not zones_with_data:
+        return {}
+    total_secs = sum(z["secsInZone"] for z in zones_with_data)
+    return {
+        f"pct_Z{z['zoneNumber']}": round(z["secsInZone"] / total_secs * 100, 1) if total_secs else 0.0
+        for z in zones_with_data
+    }
+
+
+def _bulk_activity_analysis(client, activities_df: pd.DataFrame, progress_cb=None) -> pd.DataFrame:
+    """Fetches (or reuses the on-disk cache for) the full detail of every activity in
+    activities_df and flattens it into one row per activity with splits/cadencia/zonas."""
+    rows = []
+    total = len(activities_df)
+    for i, r in enumerate(activities_df.itertuples()):
+        activity_id = int(r.activity_id)
+        row_out = {"activity_id": activity_id}
+        try:
+            bundle = cached_activity_bundle(client, activity_id)
+            laps_df = _compute_km_splits(bundle.get("details"))
+            summary_dto = (bundle.get("activity") or {}).get("summaryDTO") or {}
+            row_out["temperatura_c"] = summary_dto.get("averageTemperature")
+            row_out["fc_minima"] = summary_dto.get("minHR")
+            row_out.update(_km_splits_analysis(laps_df))
+            row_out.update(_hr_zone_breakdown(bundle.get("hr_zones")))
+        except Exception as e:
+            row_out["error"] = str(e)
+        rows.append(row_out)
+        if progress_cb:
+            progress_cb((i + 1) / total)
+    return pd.DataFrame(rows)
+
+
 def _copy_to_clipboard_button(text: str, key: str, label: str = "📋 Copiar JSON al portapapeles"):
     """Botón que copia `text` al portapapeles sin volcarlo al DOM de Streamlit
     (evita el costo de resaltado de sintaxis de st.code con textos muy grandes)."""
@@ -1292,21 +1368,71 @@ def render_activities_tab():
     _COLS = {
         "date": "Fecha", "name": "Nombre", "sport": "Deporte",
         "distance_km": "Distancia (km)", "duration_min": "Duración (min)",
-        "avg_hr": "FC media", "elevation_gain": "Desnivel (m)", "calories": "Calorías",
+        "avg_hr": "FC media", "max_hr": "FC máxima",
+        "elevation_gain": "Desnivel (m)", "calories": "Calorías",
     }
     disp = activities_df[list(_COLS.keys())].copy().rename(columns=_COLS)
     disp["Distancia (km)"] = disp["Distancia (km)"].round(2)
     disp["Duración (min)"] = disp["Duración (min)"].round(0)
     disp["Desnivel (m)"] = disp["Desnivel (m)"].round(0)
+    disp["Ritmo promedio (min/km)"] = (
+        disp["Duración (min)"] / disp["Distancia (km)"].where(disp["Distancia (km)"] > 0)
+    ).round(2)
 
     st.dataframe(disp, width="stretch", hide_index=True)
     st.download_button(
         "⬇ Descargar tabla CSV",
-        data=disp.to_csv(index=False).encode("utf-8"),
+        data=disp.to_csv(index=False).encode("utf-8-sig"),
         file_name="actividades.csv",
         mime="text/csv",
         key="btn_csv_all",
     )
+
+    # ── Detalle completo de todas las actividades (para exportar) ─────────────
+    st.caption(
+        "Para agregar splits, cadencia y zonas de FC de **todas** las actividades a la tabla, "
+        "hay que consultarle a Garmin el detalle de cada una — la primera vez puede tardar varios "
+        "minutos (después queda guardado localmente y las próximas exportaciones son instantáneas)."
+    )
+    if st.button("🔍 Cargar detalle completo de todas para exportar", key="btn_bulk_detail"):
+        progress = st.progress(0.0, text="Descargando detalle de actividades...")
+        st.session_state["act_bulk_detail_df"] = _bulk_activity_analysis(
+            st.session_state.client, activities_df, progress_cb=progress.progress
+        )
+        progress.empty()
+
+    bulk_detail_df = st.session_state.get("act_bulk_detail_df")
+    if bulk_detail_df is not None and not bulk_detail_df.empty:
+        _EXTRA_COLS = {
+            "temperatura_c": "Temperatura (°C)",
+            "fc_minima": "FC mínima",
+            "n_km": "Km con splits",
+            "mejor_km_pace_minkm": "Mejor km (min/km)",
+            "peor_km_pace_minkm": "Peor km (min/km)",
+            "split_ratio_pct": "Split ratio 1ª-2ª mitad (%)",
+            "fade_seg_km": "Fade (seg/km)",
+            "variacion_pace_cv_pct": "Variación pace CV (%)",
+            "cadencia_decaimiento_pct": "Decaimiento cadencia (%)",
+            "pct_Z1": "% Z1", "pct_Z2": "% Z2", "pct_Z3": "% Z3",
+            "pct_Z4": "% Z4", "pct_Z5": "% Z5",
+            "error": "Error",
+        }
+        present_cols = [c for c in _EXTRA_COLS if c in bulk_detail_df.columns]
+        full_disp = disp.copy()
+        full_disp["activity_id"] = activities_df["activity_id"].values
+        full_disp = full_disp.merge(
+            bulk_detail_df[["activity_id", *present_cols]], on="activity_id", how="left"
+        ).drop(columns="activity_id").rename(columns=_EXTRA_COLS)
+
+        st.success(f"Detalle completo cargado para {len(bulk_detail_df)} actividades.")
+        st.dataframe(full_disp, width="stretch", hide_index=True)
+        st.download_button(
+            "⬇ Descargar detalle completo (JSON)",
+            data=full_disp.to_json(orient="records", force_ascii=False, indent=2).encode("utf-8"),
+            file_name="actividades_detalle_completo.json",
+            mime="application/json",
+            key="btn_json_full_detail",
+        )
 
     # ── Detalle de actividad individual ───────────────────────────────────────
     st.divider()
