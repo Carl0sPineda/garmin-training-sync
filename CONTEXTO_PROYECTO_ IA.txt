@@ -114,12 +114,19 @@ Ritmo:
 10 km @5:20-5:50
 5 km @4:30
 
-Zona Garmin:
+Zona Garmin (frecuencia cardíaca):
 45 min Z2
 30 min Z3
 
-Frecuencia cardíaca:
+Frecuencia cardíaca (rango):
 40 min FC 135-150
+
+Zona de potencia:
+45 min P4
+30 min P3
+
+Potencia (rango en watts):
+40 min POT 200-230
 
 Calentamiento:
 15 min calentamiento Z2
@@ -145,6 +152,8 @@ Pueden incluir frecuencia:
 rec 1min FC 120-135
 Pueden incluir ritmo:
 rec 1min @6:00-6:30
+Pueden incluir zona de potencia:
+rec 1min P1
 
 Cuestas o segmentos variables:
 
@@ -196,6 +205,22 @@ Sesión:
 
 Deportes soportados: running, cycling, mtb, bike, biking.
 
+IMPORTANTE: en repeticiones "Nx cantidad unidad rec tiempo" el único objetivo permitido entre la cantidad/unidad y "rec" es el ritmo (@min:seg). No es posible escribir POT o zona de potencia dentro de esa posición. Si se necesitan intervalos de potencia repetidos, escribir cada bloque de trabajo y recuperación como líneas independientes (sin usar "Nx"), por ejemplo:
+
+Fecha: 2026-07-05
+Nombre: Dom05-Jul - Series potencia 4x8
+
+Sesión:
+15 min calentamiento P1
+8 min POT 210-230
+3 min P1
+8 min POT 210-230
+3 min P1
+8 min POT 210-230
+3 min P1
+8 min POT 210-230
+10 min enfriamiento P1
+
 REGLAS ESTRICTAS DEL PARSER (NO VIOLAR)
 
 El parser interpreta cada línea de forma literal. Si una regla se rompe, el paso se ignora silenciosamente y no aparece en el workout generado. Por eso:
@@ -221,7 +246,7 @@ Para progresiones de aceleración usar siempre la sintaxis dedicada: "4 progresi
 
 4. La recuperación puede escribirse como minutos/segundos (rec 1min, rec 90s) o como M:SS sin unidad (rec 2:30).
 
-5. Las zonas Garmin son de un solo dígito: Z1 a Z9.
+5. Las zonas Garmin son de un solo dígito: Z1 a Z9 (frecuencia cardíaca) y P1 a P9 (potencia).
 
 6. "Descanso" debe ser la única línea dentro de "Sesión:". Si se agrega cualquier otro texto junto a "Descanso", deja de tratarse como día de descanso.
 

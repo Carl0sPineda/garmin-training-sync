@@ -72,6 +72,21 @@ def target_hr_range(min_hr: int, max_hr: int) -> dict:
     }
 
 
+def target_power_zone(zone: int) -> dict:
+    return {
+        "type": "power_zone",
+        "zone": zone,
+    }
+
+
+def target_power_range(min_power: int, max_power: int) -> dict:
+    return {
+        "type": "power",
+        "min": min_power,
+        "max": max_power,
+    }
+
+
 def extract_target(line: str) -> dict | None:
     text = normalize(line)
 
@@ -90,6 +105,14 @@ def extract_target(line: str) -> dict | None:
     hr_match = re.search(r"\bfc\s*(\d+)\s*-\s*(\d+)", text)
     if hr_match:
         return target_hr_range(int(hr_match.group(1)), int(hr_match.group(2)))
+
+    power_range_match = re.search(r"\bpot\s*(\d+)\s*-\s*(\d+)", text)
+    if power_range_match:
+        return target_power_range(int(power_range_match.group(1)), int(power_range_match.group(2)))
+
+    power_zone_match = re.search(r"\bp\s*(\d)\b", text)
+    if power_zone_match:
+        return target_power_zone(int(power_zone_match.group(1)))
 
     return None
 
@@ -139,6 +162,14 @@ def parse_recovery_target(recovery_extra: str) -> dict | None:
     hr_match = re.search(r"\bfc\s*(\d+)\s*-\s*(\d+)", text)
     if hr_match:
         return target_hr_range(int(hr_match.group(1)), int(hr_match.group(2)))
+
+    power_range_match = re.search(r"\bpot\s*(\d+)\s*-\s*(\d+)", text)
+    if power_range_match:
+        return target_power_range(int(power_range_match.group(1)), int(power_range_match.group(2)))
+
+    power_zone_match = re.search(r"\bp\s*(\d)\b", text)
+    if power_zone_match:
+        return target_power_zone(int(power_zone_match.group(1)))
 
     pace_range = re.search(r"@?(\d+:\d{2})\s*-\s*(\d+:\d{2})", text)
     if pace_range:

@@ -153,6 +153,10 @@ def render_step(step: dict, indent: int = 0):
             target_text = f" · FC {target['min']}-{target['max']} ppm"
         elif target["type"] == "hr_zone":
             target_text = f" · Z{target['zone']}"
+        elif target["type"] == "power":
+            target_text = f" · {target['min']}-{target['max']} W"
+        elif target["type"] == "power_zone":
+            target_text = f" · P{target['zone']}"
 
     icon = {"warmup": "🔴", "run": "🔵", "recovery": "⚫", "cooldown": "🟢"}.get(step_type, "•")
     st.markdown(f"{prefix}{icon} **{step_type}** · {condition}{target_text}")

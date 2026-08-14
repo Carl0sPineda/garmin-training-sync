@@ -244,6 +244,25 @@ Ritmo único:
 
 ---
 
+## Potencia por zonas
+
+Principalmente para ciclismo/MTB.
+
+```text
+45 min P4
+30 min P3
+```
+
+---
+
+## Potencia por rango (watts)
+
+```text
+40 min POT 200-230
+```
+
+---
+
 ## Calentamiento
 
 ```text
@@ -304,6 +323,12 @@ Ritmo:
 
 ```text
 6x2min @4:20-4:40 rec 1min @6:00-6:30
+```
+
+Zona de potencia:
+
+```text
+6x2min @4:20-4:40 rec 1min P1
 ```
 
 ---
@@ -467,7 +492,7 @@ Equivale a 2 minutos 30 segundos, sin necesidad de escribir `min`.
 
 ## Zonas Garmin de un solo dígito
 
-`Z1` a `Z9`. No se reconocen zonas de dos dígitos.
+`Z1` a `Z9` (frecuencia cardíaca) y `P1` a `P9` (potencia). No se reconocen zonas de dos dígitos.
 
 ## "Descanso" debe ser la única línea de la sesión
 

@@ -29,6 +29,12 @@ HEART_RATE_TARGET_TYPE = {
     "displayOrder": 4,
 }
 
+POWER_TARGET_TYPE = {
+    "workoutTargetTypeId": 2,
+    "workoutTargetTypeKey": "power.zone",
+    "displayOrder": 2,
+}
+
 TIME_END_CONDITION = {
     "conditionTypeId": 2,
     "conditionTypeKey": "time",
@@ -132,6 +138,21 @@ def build_target(step: dict):
     if target["type"] == "hr_zone":
         return {
             "target_type": HEART_RATE_TARGET_TYPE,
+            "targetValueOne": None,
+            "targetValueTwo": None,
+            "zoneNumber": int(target["zone"]),
+        }
+
+    if target["type"] == "power":
+        return {
+            "target_type": POWER_TARGET_TYPE,
+            "targetValueOne": float(target["min"]),
+            "targetValueTwo": float(target["max"]),
+        }
+
+    if target["type"] == "power_zone":
+        return {
+            "target_type": POWER_TARGET_TYPE,
             "targetValueOne": None,
             "targetValueTwo": None,
             "zoneNumber": int(target["zone"]),
@@ -345,6 +366,12 @@ def format_target(step: dict) -> str:
 
     if target["type"] == "hr_zone":
         return f" | FC Zona {target['zone']}"
+
+    if target["type"] == "power":
+        return f" | Potencia {target['min']}-{target['max']} W"
+
+    if target["type"] == "power_zone":
+        return f" | Potencia Zona {target['zone']}"
 
     return f" | target {target['type']}"
 
