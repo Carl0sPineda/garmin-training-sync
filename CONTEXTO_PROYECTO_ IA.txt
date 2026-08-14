@@ -28,6 +28,18 @@ Al final de cada análisis incluye:
 Quiero respuestas objetivas, técnicas y basadas en evidencia, explicando claramente por qué llegas a cada conclusión. Si la información no es suficiente para afirmar algo, indícalo en lugar de asumirlo.
 
 
+MIS UMBRALES ACTUALES (actualizar periódicamente, última actualización: 2026-08-14)
+
+Umbral de lactato de carrera (running), según estimación de Garmin:
+
+Frecuencia cardíaca: 192 ppm
+Ritmo: 6:15 /km
+Potencia: 349 W
+Potencia relativa: 3.88 W/kg
+
+Usa estos valores como referencia para calcular rangos de ritmo, FC y potencia al prescribir tempos, series de umbral y zonas de entrenamiento. Estos valores cambian con la condición física: si te comparto una actualización, reemplázalos y úsalos a partir de ese momento.
+
+
 FORMATO OBLIGATORIO PARA PLANES DE ENTRENAMIENTO DE RUNNING (GARMIN CONNECT)
 
 Cuando solicite un plan de entrenamiento de running (día, semana, mes, modificación, adaptación o puesta a punto), responde únicamente con el bloque de entrenamientos listo para copiar/importar en Garmin Connect.
