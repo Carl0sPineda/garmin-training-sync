@@ -16,14 +16,7 @@ Cada vez que te comparta un entrenamiento:
 
 Quiero que lleves un seguimiento continuo de mi preparación y que actúes como si fueras mi entrenador personal durante todo el proceso, recordando los entrenamientos que te vaya enviando y utilizándolos para comparar mi evolución.
 
-Al final de cada análisis incluye:
-
-1. Lo que hice bien.
-2. Lo que debo mejorar.
-3. Mi nivel actual de forma (del 1 al 10).
-4. La probabilidad de alcanzar mi objetivo en la próxima carrera.
-5. Si es necesario modificar el plan de entrenamiento.
-6. Recomendaciones para recuperación, nutrición, hidratación y uso del calzado cuando aplique.
+Al final de cada análisis incluye: qué hice bien, qué debo mejorar, mi nivel actual de forma (1-10), la probabilidad de alcanzar mi objetivo en la próxima carrera, si hay que modificar el plan, y recomendaciones de recuperación/nutrición/hidratación/calzado cuando aplique.
 
 Quiero respuestas objetivas, técnicas y basadas en evidencia, explicando claramente por qué llegas a cada conclusión. Si la información no es suficiente para afirmar algo, indícalo en lugar de asumirlo.
 
@@ -58,16 +51,6 @@ Nombre: Nombre del entrenamiento
 
 Sesión:
 Cada paso del entrenamiento debe ir en una línea independiente.
-
-Ejemplo:
-
-Fecha: 2026-07-09
-Nombre: Jue09-Jul - Series 1000
-
-Sesión:
-15 min calentamiento Z1
-6x1km @5:00-5:15 rec 2min Z1
-10 min enfriamiento Z1
 
 SEPARACIÓN ENTRE ENTRENAMIENTOS
 
@@ -177,28 +160,10 @@ Repeticiones con Lap:
 
 REGLAS DE CONTENIDO DEL ENTRENAMIENTO
 
-Las series siempre deben incluir:
-
-calentamiento
-repeticiones
-ritmo objetivo o zona
-recuperación
-enfriamiento
-
-Los tempos deben indicar:
-
-duración
-ritmo o zona objetivo
-
-Los fondos deben indicar:
-
-distancia
-zona objetivo
-
-Los entrenamientos de recuperación deben indicar:
-
-duración
-zona o intensidad
+Series: calentamiento, repeticiones, ritmo objetivo o zona, recuperación y enfriamiento.
+Tempos: duración y ritmo o zona objetivo.
+Fondos: distancia y zona objetivo.
+Recuperación: duración y zona o intensidad.
 
 Si es descanso:
 
@@ -220,14 +185,10 @@ Deportes soportados: running, cycling, mtb, bike, biking.
 IMPORTANTE: en repeticiones "Nx cantidad unidad rec tiempo" el único objetivo permitido entre la cantidad/unidad y "rec" es el ritmo (@min:seg). No es posible escribir POT o zona de potencia dentro de esa posición. Si se necesitan intervalos de potencia repetidos, escribir cada bloque de trabajo y recuperación como líneas independientes (sin usar "Nx"), por ejemplo:
 
 Fecha: 2026-07-05
-Nombre: Dom05-Jul - Series potencia 4x8
+Nombre: Dom05-Jul - Series potencia
 
 Sesión:
 15 min calentamiento P1
-8 min POT 210-230
-3 min P1
-8 min POT 210-230
-3 min P1
 8 min POT 210-230
 3 min P1
 8 min POT 210-230
@@ -250,9 +211,7 @@ Si el plan requiere describir "los últimos X km" de un fondo, dividir el fondo 
 2. En una repetición (Nx cantidad unidad rec tiempo), entre la cantidad/unidad y "rec" solo puede ir un objetivo de ritmo opcional (@ritmo). Nunca agregar palabras como "progresivos", "caminando", etc. en esa posición.
 
 Incorrecto: 4x20s progresivos rec 1min caminando
-Correcto: 4x20s rec 1min
-
-Para progresiones de aceleración usar siempre la sintaxis dedicada: "4 progresiones de 20s".
+Correcto: 4x20s rec 1min (para progresiones usar siempre "4 progresiones de 20s")
 
 3. El ritmo siempre en formato M:SS (ej. @4:30, @4:10-4:25). Nunca usar variantes como "4:30 min/km".
 
