@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Garmin Training Sync
+Comment=Iniciar Garmin Training Sync
+# IMPORTANTE: reemplace la ruta de abajo por la ruta real donde
+# quede la carpeta del proyecto en su equipo Linux.
+Exec=bash -c "cd '/ruta/a/garmin-training-sync' && ./start_app.sh; exec bash"
+Path=/ruta/a/garmin-training-sync
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;
